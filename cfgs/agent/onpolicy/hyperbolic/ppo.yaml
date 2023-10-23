@@ -2,7 +2,7 @@ defaults:
   - base_onpolicy
   - _self_
 
-agent_name: /hyperbolic/ppo_sn
+agent_name: hyper_ppo_sn
 
 # PPO params
 agent:
@@ -18,7 +18,7 @@ agent:
       channels: [16, 32, 32]
       hidden_units: 32
       shared_conv_trunk: true
-      shared_fc_head: true
+      shared_fc_head: false
       hyperbolic_layer_index: -1 # by default last layer
       pre_hyperbolic_relu: false
       temperature_scaling: false

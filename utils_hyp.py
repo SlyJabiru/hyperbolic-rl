@@ -8,9 +8,29 @@ import numpy as np
 import torch
 from torch import nn
 import geoopt
+from scipy.spatial import distance_matrix as euclidean_distance_matrix
 
 import utils
 
+def delta_hyp(dismat):
+    """
+    computes delta hyperbolicity value from distance matrix
+    """
+
+    p = 0
+    row = dismat[p, :][np.newaxis, :]
+    col = dismat[:, p][:, np.newaxis]
+    XY_p = 0.5 * (row + col - dismat)
+
+    maxmin = np.max(np.minimum(XY_p[:, :, None], XY_p[None, :, :]), axis=1)
+    return np.max(maxmin - XY_p)
+
+def delta_rel_in_euclidean(features):
+    dists = euclidean_distance_matrix(features, features)
+    delta = delta_hyp(dists)
+    diam = np.max(dists)
+    print(f'delta: {delta}, diam: {diam}')
+    return 2 * delta / diam
 
 class UpdatableModule:
     def __init__(self, ):
@@ -196,23 +216,33 @@ class PoincarePlaneDistance(torch.nn.Module):
 
     def forward(self, input):  # input bs x in_feat
         input_batch_dims = input.size()[:-1]
-        input = input.view(-1, self.num_spaces, self.dimensions_per_space)
+        input = input.view(-1, self.num_spaces, self.dimensions_per_space) # (1,1,32)
+        # print(f'input.size(): {input.size()}') # input.size(): torch.Size([64, 1, 32])
         if self.euclidean_inputs:
-            input = self.map_to_ball(input)
+            input = self.map_to_ball(input) # euclidean to PoincareBall
             if self.hyperbolic_representation_metric is not None:
                 self.hyperbolic_representation_metric.set(hyperbolic_representations=input)
-        input_p = input.unsqueeze(-3)  # bs x 1 x num_spaces x dim_per_space
+        input_p = input.unsqueeze(-3)  # bs x 1 x num_spaces x dim_per_space. # bs x 1 x 1 x 32
+        # print(f'input_p.size(): {input_p.size()}') # input_p.size(): torch.Size([64, 1, 1, 32])
         if self.rescale_normal_params:
             conformal_factor = 1 - self.bias.pow(2).sum(dim=-1)
             a = self.normals * conformal_factor.unsqueeze(-1)
         else:
             a = self.normals
+        # print(f'a.size(): {a.size()}') # torch.Size([15, 1, 32])
         distances = self.ball.dist2plane(x=input_p, p=self.bias, a=a,
                                          signed=self.signed, scaled=self.scaled, dim=-1)
+        # distances: in_feature(32) dim point v.s. in_feature dim hyperplane in the poincare ball.
+        # one point is compared to each num_planes(15) hyperplanes
+        # print(f'distances.size(): {distances.size()}') # distances.size(): torch.Size([64, 15, 1])
         if self.rescale_normal_params:
             distances = distances * 2 / conformal_factor
         distance = distances.sum(-1)
         distance = distance.view(*input_batch_dims, self.num_planes)
+        # 어떤 평면에서 멀어지면, 값이 커짐.
+        # 즉, value 측정할 때는, 한 hyperplane 고정해두고. 거기서 멀어질 수록 value 커지는 거.
+        # action prob 낼 땐, hyperplane 15 개 있고 각 hyperplane 이 각 action 담당. 한 hyperplane 에서 멀어질 수록 action 확률 커짐.
+        # print(f'distance.size(): {distance.size()}') # distance.size(): torch.Size([64, 15])
         return distance * self.logits_multiplier
 
     def forward_rs(self, input):  # input bs x in_feat

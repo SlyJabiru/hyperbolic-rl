@@ -5,6 +5,10 @@
 import numpy as np
 import hydra
 import gym3
+import torch
+from random import random, randint
+
+from utils_hyp import delta_rel_in_euclidean
 
 class Tester():
     def __init__(self, make_eval_env, preprocessor, max_timesteps=1e6):
@@ -32,27 +36,38 @@ class Tester():
 
 class ModularTester():
     def __init__(self, eval_env_cfg, preprocessor, max_eval_timesteps=1e6,
-                 min_eval_episodes=5, train_env_cfg=None):
+                 min_eval_episodes=5, train_env_cfg=None, max_obs_for_delta_rel=2000):
         self.env_cfg = eval_env_cfg
         self.preprocessor = preprocessor
-        self.max_timesteps = max_eval_timesteps
-        self.min_episodes = min_eval_episodes
+        self.max_timesteps = max_eval_timesteps # 1000000
+        self.min_episodes = min_eval_episodes # n_eval_envs
         self.train_env_cfg = train_env_cfg
+        self.max_obs_for_delta_rel = max_obs_for_delta_rel
         if train_env_cfg is not None:
             self.train_env_cfg['num'] = self.env_cfg['num']
 
     def evaluate_from_config(self, cfg, agent, **kwargs):
         collected_returns = []
+        buffer = []
         while len(collected_returns) < self.min_episodes:
             self.env = hydra.utils.instantiate(cfg)
-            rew, obs, first = self.env.observe()
+            rew, obs, first = self.env.observe() # obs: (10, 64, 64, 3)
             last_returns = 0
             collected_returns = []
             notdones = np.ones([cfg.num])
             i = 0
+
+            delta_env_index = randint(0, cfg.num-1)
             while np.any(notdones) and i < self.max_timesteps:
                 obs = self.preprocessor.preprocess_obs(
-                    (obs['rgb'].transpose(0, 3, 1, 2)).astype(np.float32))
+                    (obs['rgb'].transpose(0, 3, 1, 2)).astype(np.float32)) # (10, 3, 64, 64)
+                # print(f'obs.shape: {obs.shape}')
+                
+                # put an observation of env[delta_env_index] to the buffer, until the buffer length becomes max_obs_for_delta_rel
+                if notdones[delta_env_index] and len(buffer) < self.max_obs_for_delta_rel: # The 0 env is not done
+                    buffer.append(obs[delta_env_index]) # (3, 64, 64)
+                    # if random() >= 0.5:
+                
                 act = agent.act(obs, **kwargs)
                 self.env.act(act)
                 rew, obs, first = self.env.observe()
@@ -60,7 +75,15 @@ class ModularTester():
                 notdones = notdones * (1 - first)
                 i += 1
             collected_returns += last_returns[np.where((1-notdones))].tolist()
-        return collected_returns
+        
+        print(f'len(buffer): {len(buffer)}')
+        delta_rel = -1
+        if len(buffer) > 1:
+            buffer_tensor = torch.stack(buffer, dim=0) # (max_obs_for_delta_rel, 3, 64, 64)
+            features = agent.ac_model.sm(buffer_tensor).detach().cpu().numpy()
+            delta_rel = delta_rel_in_euclidean(features)
+
+        return collected_returns, delta_rel
 
     def visualize_from_config(self, cfg, agent, num_episodes=1, **kwargs):
         collected_returns = []
@@ -204,8 +227,10 @@ class ModularTester():
         return stats
 
     def evaluate(self, agent, **kwargs):
-        test_returns = self.evaluate_from_config(self.env_cfg, agent, **kwargs)
+        test_returns, test_delta_rel = self.evaluate_from_config(self.env_cfg, agent, **kwargs)
         if self.train_env_cfg is not None:
-            train_returns = self.evaluate_from_config(self.train_env_cfg, agent, **kwargs)
-            return {'': test_returns, '_train': train_returns}
-        return test_returns
+            train_returns, train_delta_rel = self.evaluate_from_config(self.train_env_cfg, agent, **kwargs)
+            print(f'test_delta_rel: {test_delta_rel}, train_delta_rel: {train_delta_rel}')
+            return {'': test_returns, '_train': train_returns}, {'delta_rel': test_delta_rel, 'delta_rel_train': train_delta_rel}
+        print(f'test_delta_rel: {test_delta_rel}')
+        return {'': test_returns}, {'delta_rel': test_delta_rel}

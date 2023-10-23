@@ -28,7 +28,7 @@ def run_training(agent, buffer, env, tester, preprocessor,
     if detect_anomaly:
         print('WARNING: running with activated anomaly detection')
         torch.autograd.set_detect_anomaly(True)
-    work_dir = Path.cwd()
+    work_dir = Path.cwd() # hydra.run.dir
     print('workspace: {}'.format(work_dir))
     logger.configure_output_dir('data')
     n_rollouts = int(np.ceil(total_steps / (steps_per_rollout * n_envs)))
@@ -37,8 +37,10 @@ def run_training(agent, buffer, env, tester, preprocessor,
     current_steps = 0
     logger.log_key_val('iter', 0)
     logger.log_key_val('frame', current_steps)
-    stats = log_returns_stats(tester.evaluate(agent), log=False)
-    log_dict(stats)
+    returns, delta_rels = tester.evaluate(agent)
+    return_stats = log_returns_stats(returns, log=False)
+    log_dict(return_stats)
+    log_dict(delta_rels)
     metrics = agent.return_and_reset_metrics()
     log_dict(metrics)
     epoch_end_eval_time = time.time()
@@ -82,8 +84,10 @@ def run_training(agent, buffer, env, tester, preprocessor,
         if (r + 1) % log_frequency == 0:
             logger.log_key_val('iter', r + 1)
             logger.log_key_val('frame', current_steps)
-            stats = log_returns_stats(tester.evaluate(agent), log=False)
-            log_dict(stats)
+            returns, delta_rels = tester.evaluate(agent)
+            return_stats = log_returns_stats(returns, log=False)
+            log_dict(return_stats)
+            log_dict(delta_rels)
             metrics = agent.return_and_reset_metrics()
             log_dict(metrics)
             end_eval_time = time.time()

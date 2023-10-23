@@ -3,7 +3,8 @@
 
 
 import torch as th
-
+import omegaconf
+import wandb
 import hydra
 
 import logger
@@ -46,8 +47,15 @@ def train(cfg, agent, buffer, env, tester, preprocessor):
 @hydra.main(config_path='cfgs', config_name='config')
 def main(cfg):
     agent, buffer, env, tester, preprocessor = make_models(cfg)
+    wandb.init(
+        project=cfg.wandb.project,
+        name=cfg.wandb.name,
+        config=dict(omegaconf.OmegaConf.to_container(cfg, resolve=True, throw_on_missing=False)) # type: ignore
+    )
     hydra.utils.call(cfg.training_fn, agent=agent, buffer=buffer, env=env,
                      tester=tester, preprocessor=preprocessor) #run_training(agent, buffer, env, tester, preprocessor, cfg)
+    print(f'End of training')
+    wandb.finish()
     return agent, buffer, env, tester, preprocessor
 
 

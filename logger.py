@@ -7,6 +7,7 @@ import json
 import os
 import os.path as osp
 import time
+import wandb
 
 class LOG_DATA:
     save_it = 0
@@ -69,6 +70,8 @@ def log_iteration():
         print(fmt % (key, valstr))
         vals.append(val)
     print("+" * n_slashes)
+    wandb.log(LOG_DATA.current_row_data)
+
     if LOG_DATA.output_file_name is not None:
         if LOG_DATA.first_row:
             LOG_DATA.output_file_name.write("\t".join(LOG_DATA.headers))

@@ -1,6 +1,7 @@
 name: procgen_hyper
 channels:
   - pytorch
+  - nvidia
   - defaults
 dependencies:
   - python=3.8
@@ -12,11 +13,13 @@ dependencies:
   - plotly=5.6.0
   - ipywidgets=7.6.5
   - scikit-image=0.18.1
-  - pytorch::pytorch
-  - pytorch::torchvision
-  - pytorch::torchaudio
+  - pytorch::pytorch==1.13.1
+  - pytorch::torchvision==0.14.1
+  - pytorch::pytorch-cuda=11.6
   - cudatoolkit=11.3
   - pip:
+    - setuptools==64.0.3
+    - wheel==0.38.4
     - absl-py==1.0.0
     - antlr4-python3-runtime==4.8
     - cachetools==5.0.0

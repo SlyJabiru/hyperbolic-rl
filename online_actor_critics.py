@@ -47,7 +47,7 @@ class ActorCritic(nn.Module):
             self.sm = nn.Sequential(*shared_modules)  # Shared trunk
             self.am = nn.Sequential(*actor_modules)  # Actor head
             self.cm = nn.Sequential(*critic_modules)  # Critic head
-
+        print(f'self.fully_shared: {self.fully_shared}')
         self.modules_to_update = []
 
         for mod in shared_modules + actor_modules + critic_modules:

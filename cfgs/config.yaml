@@ -16,14 +16,18 @@ act_dims: ???
 n_actions: ???
 action_size: ???
 action_scale: ???
-logging_folder: exp_local
+logging_folder: /hdd/hdd4/lsj/hyper_rl
+
+wandb:
+  project: hyper_rl
+  name: ${agent_name}_${env_log_name}_${now:%Y.%m.%d}_${now:%H%M%S}
 
 save_weights_every: 200
 disable_cuda: false
 
 hydra:
   run:
-    dir: ./${logging_folder}/${agent_name}/${env_log_name}/${now:%Y.%m.%d}_${now:%H%M%S}
+    dir: ${logging_folder}/${agent_name}/${env_log_name}/${now:%Y.%m.%d}_${now:%H%M%S}
   sweep:
-    dir: ./${logging_folder}/ #SWEEP_${now:%Y.%m.%d}_${now:%H%M%S}
+    dir: ${logging_folder}/ #SWEEP_${now:%Y.%m.%d}_${now:%H%M%S}
     subdir: ${agent_name}/${env_log_name}/${now:%Y.%m.%d}_${now:%H%M%S}

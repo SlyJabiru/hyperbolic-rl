@@ -17,7 +17,7 @@ agent:
       channels: [16, 32, 32]
       hidden_units: 256
       shared_conv_trunk: true
-      shared_fc_head: true
+      shared_fc_head: false
       pre_final_sn: true
   optimizer:
     _target_: ppo.th.optim.Adam
